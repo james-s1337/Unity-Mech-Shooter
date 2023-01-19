@@ -1,0 +1,76 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SpawnManager : MonoBehaviour
+{
+    public List<GameObject> obstacles;
+    public GameObject playArea;
+
+    private float spawnRate; // Obstacle/sec
+    private float rateOfIncr = 0.02f; // Spawn rate increase per sec
+    private float timeSinceLastObsc;// Time since last obstacle spawned
+    private float timeSinceDiffClimb;
+    private float diffClimbRate;
+    private readonly float INITIAL_SPAWN_RATE = 2f;
+    private readonly float DEFAULT_CLIMB_RATE = 4f;
+    private readonly float MAX_SPAWN_RATE = 0.55f; // Max rate obstacles can spawn at
+    private int diffLevel;
+    [SerializeField] private GameManager gm;
+    void Start()
+    {
+        diffLevel = 1; // When difficulty is reached to max, go to next map
+        timeSinceLastObsc = Time.time;
+        timeSinceDiffClimb = Time.time;
+        spawnRate = INITIAL_SPAWN_RATE;
+        diffClimbRate = DEFAULT_CLIMB_RATE;
+    }
+
+    void Update()
+    {
+        // Spawn obstacle based on spawn rate
+        if (Time.time - timeSinceLastObsc >= spawnRate && gm.gameState != GameManager.GameState.Dead)
+        {
+            timeSinceLastObsc = Time.time;
+            // If spawn rate is not maxed, increase spawn rate 
+            if (spawnRate > MAX_SPAWN_RATE)
+            {
+                spawnRate = Mathf.Clamp(spawnRate - rateOfIncr, MAX_SPAWN_RATE, INITIAL_SPAWN_RATE);
+            }
+            int randIndex = Random.Range(0, diffLevel);
+            GameObject randObstacle = obstacles[randIndex];
+            Instantiate(randObstacle, ReturnRandomPos(randObstacle), Quaternion.identity);
+        }
+        if (Time.time - timeSinceDiffClimb >= diffClimbRate)
+        {
+            timeSinceDiffClimb = Time.time;
+            diffClimbRate *= 2;
+            diffLevel += 1;
+            if (diffLevel > obstacles.Count)
+            {
+                diffLevel -= 1;
+                // In future, will switch map setting (just change background and obstacle list)
+                // Spawn boss?
+            }
+        }
+    }
+
+    private Vector3 ReturnRandomPos(GameObject obstc)
+    {
+        float minHeight = playArea.transform.localScale.y / 2 + (obstc.transform.localScale.y / 2);
+        float maxHeight = 6f + minHeight; // Same y boundary value as player
+        float x = 10f; // fixed value, starting point
+        float y;
+        if (!obstc.GetComponent<Obstacle>().isGrounded)
+        {
+            y = Random.Range(minHeight + maxHeight / 4, maxHeight);
+        }
+        else
+        {
+            y = minHeight;
+        }
+            
+        float z = 0;
+        return new Vector3(x, y, z);
+    }
+}
