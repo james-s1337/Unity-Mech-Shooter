@@ -1,0 +1,203 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+
+public class PlayerController : MonoBehaviour
+{
+    public GameObject playerSkin;
+    public GameObject projectile;
+    public GameObject playArea;
+    public Rigidbody2D body;
+    public AudioSource deathSound;
+    public AudioSource hitSound;
+    public UnityEvent fuelEvent = new UnityEvent(); // fuelEvent.AddListener(function that updates fuel UI bar)
+
+    [SerializeField] private GameManager gm;
+    private bool isUnderEffect = false;
+    private bool canShoot = true;
+    private bool isBoosting = false;
+    private float jetpackFuel;
+    private Skin playerSkinStats;
+    private readonly float defaultJetpackPower = 100;
+    private readonly float defaultFuelDrain = 50f;
+    private readonly float regenCooldown = 1f;
+    private float timeSinceBoost= 0;
+    private float timeSinceFire = 0;
+    private float fireCooldown = 0;
+    private float xBound = 0f;
+    private float yBound = 6f;
+    private PlayerStat speed;
+    private PlayerStat health;
+
+    void Start()
+    { 
+        ChangeSkin();
+        if (playArea)
+        {
+            Vector3 startPos = new Vector3(0, playArea.transform.localScale.y / 2 + transform.localScale.y / 2, 0);
+            xBound = (playArea.transform.localScale.x / 2 - transform.localScale.x / 2);
+            yBound += playArea.transform.localScale.y / 2;
+            transform.position = startPos;
+        }
+    }
+
+    void Update()
+    {
+        if (health.Val > 0) {
+            var horizontalInput = Input.GetAxis("Horizontal");
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                isBoosting = true;
+            }
+            else if (Input.GetKeyUp(KeyCode.Space))
+            {
+                isBoosting = false;
+            }
+            if (isBoosting && jetpackFuel > 0)
+            {
+                timeSinceBoost = Time.time;
+                DrainFuel(defaultFuelDrain * Time.deltaTime);
+                float jetpackTranslation = Mathf.Clamp(defaultJetpackPower - playerSkinStats.weight, 0, defaultJetpackPower - playerSkinStats.weight);
+                Vector3 jumpForce = new Vector3(1 * horizontalInput * jetpackTranslation, jetpackTranslation, 0);
+                body.MovePosition(transform.position + jumpForce * Time.deltaTime);
+                body.velocity = new Vector2(0, Mathf.Clamp(body.velocity.y, -2, 10));
+                transform.position = ReturnClampedPos();
+            }
+            else if (!isBoosting || jetpackFuel <= 0)
+            {
+                transform.Translate(Vector3.right * speed.Val * Time.deltaTime * horizontalInput);
+                transform.position = ReturnClampedPos();
+                if (Time.time - timeSinceBoost >= regenCooldown)
+                {
+                    RegenFuel(); // make ui showing how much fuel you have 
+                }
+            }
+            if (Input.GetMouseButton(0) && canShoot)
+            {
+                Fire();
+            }
+        }
+    }
+
+    private void ChangeSkin()
+    {
+        if (playerSkin)
+        {
+            playerSkinStats = playerSkin.GetComponent<Skin>();
+            if (playerSkinStats)
+            {
+                speed = new PlayerStat(playerSkinStats.speed);
+                health = new PlayerStat(playerSkinStats.health);
+                fireCooldown = projectile.GetComponent<Bullet>().cooldown;
+                jetpackFuel = playerSkinStats.fuel;
+                body.mass = playerSkinStats.weight;
+                gm.UpdateHealth(health.Val);
+            }
+        }
+        else
+        {
+            // End game, error
+        }
+    }
+
+    private void DrainFuel(float amount)
+    {
+        jetpackFuel = Mathf.Clamp(jetpackFuel - amount, 0, playerSkinStats.fuel);
+        fuelEvent.Invoke();
+    }
+
+    private void RegenFuel()
+    {
+        jetpackFuel = Mathf.Clamp(jetpackFuel + playerSkinStats.fuelRegen * Time.deltaTime, 0, playerSkinStats.fuel);
+        fuelEvent.Invoke();
+    }
+
+    private Vector3 ReturnClampedPos()
+    {
+        return new Vector3(Mathf.Clamp(transform.position.x, -xBound, xBound), Mathf.Clamp(transform.position.y, -yBound, yBound), transform.position.z);
+    }
+
+    private void Fire()
+    {
+        if (Time.time - timeSinceFire >= fireCooldown)
+        {
+            timeSinceFire = Time.time;
+            if (projectile)
+            {
+                Instantiate(projectile, transform.position, Quaternion.identity);
+            }    
+        }
+    }
+
+    public void TakeDamage(float damage)
+    {
+        if (health.Val > 0) 
+        { 
+            health.Val = Mathf.Clamp(health.Val - damage, 0, playerSkinStats.health);
+            gm.UpdateHealth(health.Val);
+            if (health.Val <= 0)
+            {
+                deathSound.Play();
+                Debug.Log("You are dead.");
+                gm.GameOver();  
+            }
+        }      
+    }
+
+    public void PlayHitSound(float pitch)
+    {
+        hitSound.pitch = pitch;
+        hitSound.Play();
+    }
+
+    public float ReturnCurrentFuel()
+    {
+        return jetpackFuel;
+    }
+
+    public float ReturnMaxFuel()
+    {
+        return playerSkinStats.fuel;
+    }
+
+    public void Slow(float percentage, float duration)
+    {
+        if (percentage < 1)
+        {
+            speed.Val *= (1 - percentage);
+        }
+        StartCoroutine(Wait(duration, "Slow"));
+    }
+
+    public void GunJam(float duration)
+    {
+        canShoot = false;
+        StartCoroutine(Wait(duration, "JamWeapon"));
+    }
+
+    public void Stun(float duration)
+    {
+        speed.Val = 0;
+        StartCoroutine(Wait(duration, "Stun"));
+    }
+
+    public void SetUnderEffect()
+    {
+        isUnderEffect = true;
+    }
+
+    IEnumerator Wait(float duration, string effect)
+    {
+        yield return new WaitForSeconds(duration);
+        if (effect == "Slow" || effect == "Stun")
+        {
+            speed.Val = playerSkinStats.speed;
+        }
+        else
+        {
+            canShoot = true;
+        }
+        isUnderEffect = false;
+    }
+}
