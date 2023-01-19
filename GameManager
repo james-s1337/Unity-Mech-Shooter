@@ -1,0 +1,96 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class GameManager : MonoBehaviour
+{
+    public Image fuelBar;
+    public Text scoreDisplay;
+    public Text healthDisplay;
+    [SerializeField] private PlayerController playerController;
+    public enum GameState { 
+        Playing, 
+        Paused,
+        Dead
+    }
+    public GameState gameState;
+
+    private bool canPause;
+    private float scorePerSecond = 10f;
+    private float score;
+    void Start()
+    {
+        score = 0;
+        canPause = true;
+        playerController.fuelEvent.AddListener(UpdateBar);
+        gameObject.GetComponent<AudioSource>().Play();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape) && canPause)
+        {
+            if (gameState != GameState.Dead)
+            {
+                canPause = false;
+                if (gameState == GameState.Playing)
+                {
+                    gameState = GameState.Paused;
+                }
+                else
+                {
+                    gameState = GameState.Playing;
+                }
+                StartCoroutine(nameof(CanPauseReset));
+            }
+        }
+
+        if (gameState == GameState.Paused)
+        {
+            Time.timeScale = 0;
+        }
+        else
+        {
+            Time.timeScale = 1;
+        }
+        UpdateScore();
+    }
+
+    public void UpdateBar()
+    {
+        float percentage = playerController.ReturnCurrentFuel() / playerController.ReturnMaxFuel();
+        float defaultYSize = 400f;
+        percentage = Mathf.Clamp(percentage, 0, 1);
+        fuelBar.rectTransform.sizeDelta = new Vector2(fuelBar.rectTransform.sizeDelta.x, defaultYSize * percentage);
+    }
+
+    private void UpdateScore()
+    {
+        if (gameState == GameState.Playing)
+        {
+            score += scorePerSecond * Time.deltaTime;
+            scoreDisplay.text = "Score: " + (int)score;
+        }   
+    }
+
+    public void UpdateHealth(float health)
+    {
+        // text for now
+        healthDisplay.text = "" + health;
+    }
+
+    public void GameOver()
+    {
+        gameState = GameState.Dead;
+        Debug.Log("Your score: " + (int) score);
+    }
+
+    IEnumerator CanPauseReset()
+    {
+        float time = Time.unscaledTime;
+        yield return new WaitUntil(() => Time.unscaledTime - time >= 1);
+        canPause = true;
+    }
+}
