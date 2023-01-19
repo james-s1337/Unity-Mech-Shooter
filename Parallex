@@ -1,0 +1,17 @@
+using UnityEngine;
+
+public class Parallex : MonoBehaviour
+{
+    private float defaultSpeed = 0.4f;
+    private float slowDownRate = 0.3f;
+    private float bgLen;
+    [SerializeField] private GameManager gm;
+
+    void Update()
+    {
+        foreach (Transform bg in transform)
+        {
+            bg.Translate(Vector3.left * (defaultSpeed * (1 - bg.position.z)) * Time.deltaTime);
+        }    
+    }
+}
