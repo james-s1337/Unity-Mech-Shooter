@@ -1,0 +1,97 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Obstacle : MonoBehaviour
+{
+    public float speed;
+    public float damage;
+    public float weight; // Only used for scaling hit sound
+    public Vector3 direction;
+    public float health;
+    public bool isGrounded;
+    public AudioSource hitSound;
+
+    private GameObject playArea;
+    private float xBound;
+    private bool canDamage;
+    [SerializeField] private float slowPercentage;
+    [SerializeField] private float effectDuration;
+    private float minPitch = 0.3f;
+    private float maxPitch = 3f;
+    private float pitch;
+    private enum SpecialEffects
+    {
+        None,
+        Slow,
+        Stun,
+        JamWeapon
+    }
+    [SerializeField] private SpecialEffects effect;
+    void Start()
+    {
+        canDamage = true;
+        if (isGrounded && playArea)
+        {
+            Vector3 startPos = new Vector3(transform.position.x, playArea.transform.localScale.y / 2 + transform.localScale.y / 2, transform.position.z);
+            transform.position = startPos;
+        }
+        xBound = 10f;
+        playArea = GameObject.FindGameObjectWithTag("Ground");
+        pitch = Mathf.Clamp((float) (3 - (0.1 * (weight - 1))), minPitch, maxPitch); 
+    }
+
+    void Update()
+    {
+        transform.Translate(direction * Time.deltaTime * speed);
+        if (Mathf.Abs(transform.position.x) > xBound)
+        {
+            Destroy(gameObject);
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player") && gameObject.tag == "Obstacle")
+        {
+            if (canDamage) {
+                canDamage = false;
+                PlayerController player = other.GetComponent<PlayerController>();
+                player.PlayHitSound(pitch);
+                player.TakeDamage(damage);
+                ApplySpecialEffect(player);
+                Destroy(gameObject);
+            }
+        }
+    }
+
+    public void TakeDamage(float damage)
+    {
+        if (gameObject.tag == "Obstacle" && Mathf.Abs(transform.position.x) < (playArea.transform.localScale.x / 2 - transform.localScale.x / 2))
+        {
+            hitSound.Play();
+            health -= damage;
+            if (health <= 0)
+            {
+                Destroy(gameObject);
+            }
+        }
+    }
+
+    private void ApplySpecialEffect(PlayerController player)
+    {
+        player.SetUnderEffect();
+        if (effect == SpecialEffects.Slow)
+        {
+            player.Slow(slowPercentage, effectDuration);
+        }
+        else if (effect == SpecialEffects.Stun)
+        {
+            player.Stun(effectDuration);
+        }
+        else
+        {
+            player.GunJam(effectDuration);
+        }
+    }
+}
