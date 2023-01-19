@@ -1,0 +1,47 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class PlayerStat
+{
+    private float val;
+    public float Val 
+    {
+        get { return ReturnValue(); }
+        set { val = value; }
+    }
+    private List<float> modifiers;
+
+    private float ReturnValue()
+    {
+        float returnValue = val;
+        foreach (float mod in modifiers)
+        {
+            returnValue += mod;
+        }
+        return returnValue;
+    }
+    public PlayerStat(float value)
+    {
+        val = value;
+        modifiers = new List<float>();
+    }
+    
+    public void AddModifier(float mod)
+    {
+        if (modifiers.Count < 3 && mod != 0)
+        {
+            modifiers.Add(mod);
+        }    
+    }
+
+    public void RemoveModifier(float mod)
+    {
+        modifiers.Remove(mod);
+    }
+
+    public void ClearModifiers()
+    {
+        modifiers.Clear();
+    }
+}
